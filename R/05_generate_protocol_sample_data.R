@@ -9,10 +9,61 @@
 #   data/sample_medication_error.csv
 ############################################################
 
-set.seed(20260722)
+#============================================================
+# 共通パス設定
+#============================================================
 
-dir.create("data", showWarnings = FALSE, recursive = TRUE)
-dir.create("results", showWarnings = FALSE, recursive = TRUE)
+R_DIRECTORY <- normalizePath(
+  "/Users/nakamuratatsuya/Desktop/R",
+  mustWork = TRUE
+)
+
+DATA_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "data"
+)
+
+RESULTS_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "results"
+)
+
+FIGURE_DIRECTORY <- file.path(
+  RESULTS_DIRECTORY,
+  "figures"
+)
+
+dir.create(
+  DATA_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  RESULTS_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  FIGURE_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+setwd(R_DIRECTORY)
+
+cat(
+  "\nR directory:",
+  R_DIRECTORY,
+  "\nData directory:",
+  DATA_DIRECTORY,
+  "\nResults directory:",
+  RESULTS_DIRECTORY,
+  "\n"
+)
+
+set.seed(20260722)
 
 #-----------------------------------------------------------
 # 補助関数
@@ -798,38 +849,56 @@ stopifnot(
 
 write.csv(
   patient_data,
-  "data/sample_patient.csv",
+  file.path(
+    DATA_DIRECTORY,
+    "sample_patient.csv"
+  ),
   row.names = FALSE,
   na = ""
 )
 
 write.csv(
   landmark_data,
-  "data/sample_landmark_long.csv",
+  file.path(
+    DATA_DIRECTORY,
+    "sample_landmark_long.csv"
+  ),
   row.names = FALSE,
   na = ""
 )
 
 write.csv(
   error_data,
-  "data/sample_medication_error.csv",
+  file.path(
+    DATA_DIRECTORY,
+    "sample_medication_error.csv"
+  ),
   row.names = FALSE,
   na = ""
 )
 
 saveRDS(
   patient_data,
-  "data/sample_patient.rds"
+  file.path(
+    DATA_DIRECTORY,
+    "sample_patient.rds"
+  )
 )
 
 saveRDS(
   landmark_data,
-  "data/sample_landmark_long.rds"
+  file.path(
+    DATA_DIRECTORY,
+    "sample_landmark_long.rds"
+  )
 )
 
 saveRDS(
   error_data,
-  "data/sample_medication_error.rds"
+  file.path(
+    DATA_DIRECTORY,
+    "sample_medication_error.rds"
+  )
 )
 
 cat("\n合成データ作成完了\n")

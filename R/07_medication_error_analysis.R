@@ -23,6 +23,60 @@ options(
 )
 
 #============================================================
+# 共通パス設定
+#============================================================
+
+R_DIRECTORY <- normalizePath(
+  "/Users/nakamuratatsuya/Desktop/R",
+  mustWork = TRUE
+)
+
+DATA_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "data"
+)
+
+RESULTS_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "results"
+)
+
+FIGURE_DIRECTORY <- file.path(
+  RESULTS_DIRECTORY,
+  "figures"
+)
+
+dir.create(
+  DATA_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  RESULTS_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  FIGURE_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+setwd(R_DIRECTORY)
+
+cat(
+  "\nR directory:",
+  R_DIRECTORY,
+  "\nData directory:",
+  DATA_DIRECTORY,
+  "\nResults directory:",
+  RESULTS_DIRECTORY,
+  "\n"
+)
+
+#============================================================
 # 1. 必要パッケージ
 #============================================================
 
@@ -54,59 +108,14 @@ library(lmtest)
 library(MASS)
 
 #============================================================
-# 2. このRスクリプトが保存されているフォルダを取得
+# 2. フォルダ設定
 #============================================================
 
-get_script_directory <- function() {
+project_root <- R_DIRECTORY
 
-  frames <- sys.frames()
+data_directory <- DATA_DIRECTORY
 
-  script_files <- vapply(
-    frames,
-    function(frame) {
-
-      if (is.null(frame$ofile)) {
-        return(NA_character_)
-      }
-
-      as.character(frame$ofile)
-    },
-    character(1)
-  )
-
-  script_files <- script_files[
-    !is.na(script_files) &
-      nzchar(script_files)
-  ]
-
-  if (length(script_files) > 0) {
-
-    script_path <- normalizePath(
-      tail(script_files, 1),
-      mustWork = FALSE
-    )
-
-    return(dirname(script_path))
-  }
-
-  # source()ではなくRStudio上で部分実行した場合
-  normalizePath(
-    getwd(),
-    mustWork = FALSE
-  )
-}
-
-project_root <- get_script_directory()
-
-data_directory <- file.path(
-  project_root,
-  "data"
-)
-
-results_directory <- file.path(
-  project_root,
-  "results"
-)
+results_directory <- RESULTS_DIRECTORY
 
 dir.create(
   data_directory,
@@ -130,7 +139,7 @@ cat(
 )
 
 cat(
-  "プロジェクトルート:\n",
+  "Rフォルダ:\n",
   project_root,
   "\n"
 )

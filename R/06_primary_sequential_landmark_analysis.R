@@ -15,6 +15,60 @@
 #   ランドマーク時期との交互作用
 ############################################################
 
+#============================================================
+# 共通パス設定
+#============================================================
+
+R_DIRECTORY <- normalizePath(
+  "/Users/nakamuratatsuya/Desktop/R",
+  mustWork = TRUE
+)
+
+DATA_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "data"
+)
+
+RESULTS_DIRECTORY <- file.path(
+  R_DIRECTORY,
+  "results"
+)
+
+FIGURE_DIRECTORY <- file.path(
+  RESULTS_DIRECTORY,
+  "figures"
+)
+
+dir.create(
+  DATA_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  RESULTS_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+dir.create(
+  FIGURE_DIRECTORY,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+setwd(R_DIRECTORY)
+
+cat(
+  "\nR directory:",
+  R_DIRECTORY,
+  "\nData directory:",
+  DATA_DIRECTORY,
+  "\nResults directory:",
+  RESULTS_DIRECTORY,
+  "\n"
+)
+
 required_packages <- c(
   "survival",
   "sandwich",
@@ -40,14 +94,28 @@ library(splines)
 library(cmprsk)
 library(ggplot2)
 
-dir.create("results", showWarnings = FALSE)
-
 #-----------------------------------------------------------
 # データ読み込み
 #-----------------------------------------------------------
 
+landmark_data_file <- file.path(
+  DATA_DIRECTORY,
+  "sample_landmark_long.rds"
+)
+
+if (!file.exists(landmark_data_file)) {
+  stop(
+    paste0(
+      "ランドマークデータがありません:\n",
+      landmark_data_file,
+      "\n\n",
+      "先に05_generate_protocol_sample_data.Rを実行してください。"
+    )
+  )
+}
+
 d <- readRDS(
-  "data/sample_landmark_long.rds"
+  landmark_data_file
 )
 
 d <- d[
@@ -152,7 +220,10 @@ landmark_flow <- do.call(
 
 write.csv(
   landmark_flow,
-  "results/landmark_flow.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "landmark_flow.csv"
+  ),
   row.names = FALSE
 )
 
@@ -224,7 +295,10 @@ main_results <- data.frame(
 
 write.csv(
   main_results,
-  "results/main_pooled_logistic.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "main_pooled_logistic.csv"
+  ),
   row.names = FALSE
 )
 
@@ -434,13 +508,19 @@ standardized_result <- data.frame(
 
 write.csv(
   standardized_result,
-  "results/main_standardized_risk.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "main_standardized_risk.csv"
+  ),
   row.names = FALSE
 )
 
 write.csv(
   bootstrap_result$bootstrap_estimates,
-  "results/main_standardized_bootstrap.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "main_standardized_bootstrap.csv"
+  ),
   row.names = FALSE
 )
 
@@ -531,19 +611,28 @@ model3_results <- extract_robust_glm(
 
 write.csv(
   model1_results,
-  "results/model1_basic.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "model1_basic.csv"
+  ),
   row.names = FALSE
 )
 
 write.csv(
   model2_results,
-  "results/model2_patient_state.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "model2_patient_state.csv"
+  ),
   row.names = FALSE
 )
 
 write.csv(
   model3_results,
-  "results/model3_clinical_judgement.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "model3_clinical_judgement.csv"
+  ),
   row.names = FALSE
 )
 
@@ -569,7 +658,10 @@ nonlinearity_test <- anova(
 
 capture.output(
   nonlinearity_test,
-  file = "results/nonlinearity_test.txt"
+  file = file.path(
+    RESULTS_DIRECTORY,
+    "nonlinearity_test.txt"
+  )
 )
 
 #-----------------------------------------------------------
@@ -621,7 +713,10 @@ interaction_results <- extract_robust_glm(
 
 write.csv(
   interaction_results,
-  "results/landmark_interaction.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "landmark_interaction.csv"
+  ),
   row.names = FALSE
 )
 
@@ -680,7 +775,10 @@ cox_results <- data.frame(
 
 write.csv(
   cox_results,
-  "results/cause_specific_cox.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "cause_specific_cox.csv"
+  ),
   row.names = FALSE
 )
 
@@ -707,7 +805,10 @@ for (lm_value in levels(d$landmark)) {
 
 saveRDS(
   cif_results,
-  "results/cumulative_incidence_by_landmark.rds"
+  file.path(
+    RESULTS_DIRECTORY,
+    "cumulative_incidence_by_landmark.rds"
+  )
 )
 
 #-----------------------------------------------------------
@@ -731,7 +832,10 @@ current_mrci_results <- extract_robust_glm(
 
 write.csv(
   current_mrci_results,
-  "results/current_mrci_model.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "current_mrci_model.csv"
+  ),
   row.names = FALSE
 )
 
@@ -767,7 +871,10 @@ previous_current_results <- extract_robust_glm(
 
 write.csv(
   previous_current_results,
-  "results/previous_current_mrci_model.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "previous_current_mrci_model.csv"
+  ),
   row.names = FALSE
 )
 
@@ -807,7 +914,10 @@ day30_results <- extract_robust_glm(
 
 write.csv(
   day30_results,
-  "results/sensitivity_day30_only.csv",
+  file.path(
+    RESULTS_DIRECTORY,
+    "sensitivity_day30_only.csv"
+  ),
   row.names = FALSE
 )
 
@@ -829,12 +939,18 @@ saveRDS(
     fit_previous_current = fit_previous_current,
     fit_day30 = fit_day30
   ),
-  "results/primary_analysis_objects.rds"
+  file.path(
+    RESULTS_DIRECTORY,
+    "primary_analysis_objects.rds"
+  )
 )
 
 capture.output(
   sessionInfo(),
-  file = "results/sessionInfo_primary.txt"
+  file = file.path(
+    RESULTS_DIRECTORY,
+    "sessionInfo_primary.txt"
+  )
 )
 
 cat("\n逐次ランドマーク主要解析完了\n")

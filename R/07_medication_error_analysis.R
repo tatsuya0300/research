@@ -26,53 +26,26 @@ options(
 # 共通パス設定
 #============================================================
 
-R_DIRECTORY <- normalizePath(
-  "/Users/nakamuratatsuya/Desktop/R",
-  mustWork = TRUE
-)
+# プロジェクトルートの検出（rprojroot）
+if (requireNamespace("rprojroot", quietly = TRUE)) {
+  library(rprojroot)
+  ROOT <- find_root(is_git_root | has_file("research.Rproj"))
+} else {
+  ROOT <- getwd()
+}
 
-DATA_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "data"
-)
+DATA_DIRECTORY    <- file.path(ROOT, "data")
+RESULTS_DIRECTORY <- file.path(ROOT, "results")
+FIGURE_DIRECTORY  <- file.path(RESULTS_DIRECTORY, "figures")
 
-RESULTS_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "results"
-)
-
-FIGURE_DIRECTORY <- file.path(
-  RESULTS_DIRECTORY,
-  "figures"
-)
-
-dir.create(
-  DATA_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  RESULTS_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  FIGURE_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-setwd(R_DIRECTORY)
+dir.create(DATA_DIRECTORY,    recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIRECTORY,  recursive = TRUE, showWarnings = FALSE)
 
 cat(
-  "\nR directory:",
-  R_DIRECTORY,
-  "\nData directory:",
-  DATA_DIRECTORY,
-  "\nResults directory:",
-  RESULTS_DIRECTORY,
+  "\nRoot:", ROOT,
+  "\nData:", DATA_DIRECTORY,
+  "\nResults:", RESULTS_DIRECTORY,
   "\n"
 )
 

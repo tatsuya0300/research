@@ -12,56 +12,33 @@ options(
 # 共通パス設定
 #============================================================
 
-R_DIRECTORY <- normalizePath(
-  "/Users/nakamuratatsuya/Desktop/R",
-  mustWork = TRUE
-)
+if (requireNamespace("rprojroot", quietly = TRUE)) {
+  library(rprojroot)
+  ROOT <- find_root(is_git_root | has_file("research.Rproj"))
+} else {
+  ROOT <- getwd()
+}
 
-DATA_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "data"
-)
+DATA_DIRECTORY    <- file.path(ROOT, "data")
+RESULTS_DIRECTORY <- file.path(ROOT, "results")
+FIGURE_DIRECTORY  <- file.path(RESULTS_DIRECTORY, "figures")
 
-RESULTS_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "results"
-)
-
-FIGURE_DIRECTORY <- file.path(
-  RESULTS_DIRECTORY,
-  "figures"
-)
-
-dir.create(
-  DATA_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  RESULTS_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  FIGURE_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-setwd(R_DIRECTORY)
+dir.create(DATA_DIRECTORY,    recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIRECTORY,  recursive = TRUE, showWarnings = FALSE)
 
 #============================================================
 # 実行するスクリプト
 #============================================================
 
 scripts <- file.path(
-  R_DIRECTORY,
+  ROOT, "R",
   c(
     "05_generate_protocol_sample_data.R",
     "06_primary_sequential_landmark_analysis.R",
-    "07_medication_error_analysis.R"
+    "07_medication_error_analysis.R",
+    "10_manuscript_analysis.R",
+    "11_medication_error_manuscript_analysis.R"
   )
 )
 

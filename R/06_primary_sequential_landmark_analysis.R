@@ -19,53 +19,28 @@
 # 共通パス設定
 #============================================================
 
-R_DIRECTORY <- normalizePath(
-  "/Users/nakamuratatsuya/Desktop/R",
-  mustWork = TRUE
-)
+# プロジェクトルートの検出（rprojroot）
+if (requireNamespace("rprojroot", quietly = TRUE)) {
+  library(rprojroot)
+  ROOT <- find_root(is_git_root | has_file("research.Rproj"))
+} else {
+  ROOT <- getwd()
+}
 
-DATA_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "data"
-)
+DATA_DIRECTORY    <- file.path(ROOT, "data")
+RESULTS_DIRECTORY <- file.path(ROOT, "results")
+FIGURE_DIRECTORY  <- file.path(RESULTS_DIRECTORY, "figures")
+TABLE_DIRECTORY   <- file.path(RESULTS_DIRECTORY, "tables")
 
-RESULTS_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "results"
-)
-
-FIGURE_DIRECTORY <- file.path(
-  RESULTS_DIRECTORY,
-  "figures"
-)
-
-dir.create(
-  DATA_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  RESULTS_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  FIGURE_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-setwd(R_DIRECTORY)
+dir.create(DATA_DIRECTORY,    recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIRECTORY,  recursive = TRUE, showWarnings = FALSE)
+dir.create(TABLE_DIRECTORY,   recursive = TRUE, showWarnings = FALSE)
 
 cat(
-  "\nR directory:",
-  R_DIRECTORY,
-  "\nData directory:",
-  DATA_DIRECTORY,
-  "\nResults directory:",
-  RESULTS_DIRECTORY,
+  "\nRoot:", ROOT,
+  "\nData:", DATA_DIRECTORY,
+  "\nResults:", RESULTS_DIRECTORY,
   "\n"
 )
 
@@ -310,217 +285,91 @@ print(
 )
 
 #-----------------------------------------------------------
-# 標準化予測関数
+# 標準化予測関数（Results案準拠版）
 #
-# 観察された各患者・ランドマーク行について、
-# delta_mrciを一律5点増加させた場合と
-# 観察値の場合を比較する。
-#
-# これは因果効果ではなく、
-# fitted modelに基づく標準化関連である。
+# ΔMRCI-J = 0点 vs +5点（delta5 = 0 vs delta5 = 1）
+# の標準化比較。delta method SE、患者cluster-robust covariance
 #-----------------------------------------------------------
 
-standardized_shift <- function(
-  fit,
-  data,
-  shift_delta5 = 1
-) {
+standardized_probability <- function(fit, newdata, delta5_value, vcov_matrix) {
 
-  observed_data <- data
-  shifted_data <- data
+  nd <- newdata
+  nd$delta5 <- delta5_value
 
-  shifted_data$delta5 <-
-    shifted_data$delta5 + shift_delta5
+  p <- predict(fit, newdata = nd, type = "response")
 
-  p_observed <- predict(
-    fit,
-    newdata = observed_data,
-    type = "response"
+  beta <- coef(fit)
+  keep <- !is.na(beta)
+  beta_names <- names(beta)[keep]
+
+  X <- model.matrix(
+    delete.response(terms(fit)),
+    data = nd,
+    contrasts.arg = fit$contrasts,
+    xlev = fit$xlevels
   )
+  X <- X[, beta_names, drop = FALSE]
+  V <- vcov_matrix[beta_names, beta_names, drop = FALSE]
 
-  p_shifted <- predict(
-    fit,
-    newdata = shifted_data,
-    type = "response"
-  )
+  gradient <- colMeans(X * as.numeric(p * (1 - p)))
+  estimate <- mean(p)
+  se <- sqrt(as.numeric(t(gradient) %*% V %*% gradient))
 
-  risk0 <- mean(p_observed, na.rm = TRUE)
-  risk1 <- mean(p_shifted, na.rm = TRUE)
+  list(estimate = estimate, standard_error = se, gradient = gradient)
+}
+
+standardized_0_vs_5 <- function(fit, data, vcov_matrix) {
+
+  r0 <- standardized_probability(fit, data, 0, vcov_matrix)
+  r5 <- standardized_probability(fit, data, 1, vcov_matrix)
+
+  V <- vcov_matrix[names(coef(fit))[!is.na(coef(fit))],
+                   names(coef(fit))[!is.na(coef(fit))],
+                   drop = FALSE]
+
+  # 絶対リスク差
+  rd <- r5$estimate - r0$estimate
+  grad_rd <- r5$gradient - r0$gradient
+  se_rd <- sqrt(as.numeric(t(grad_rd) %*% V %*% grad_rd))
+
+  # リスク比（log RRのSE）
+  rr <- r5$estimate / r0$estimate
+  grad_log_rr <- r5$gradient / r5$estimate - r0$gradient / r0$estimate
+  se_log_rr <- sqrt(as.numeric(t(grad_log_rr) %*% V %*% grad_log_rr))
 
   data.frame(
-    observed_standardized_risk = risk0,
-    shifted_standardized_risk = risk1,
-    risk_difference = risk1 - risk0,
-    risk_ratio = risk1 / risk0
+    estimand = c(
+      "Standardized risk: delta MRCI-J = 0",
+      "Standardized risk: delta MRCI-J = +5",
+      "Absolute risk difference: +5 vs 0",
+      "Risk ratio: +5 vs 0"
+    ),
+    estimate = c(r0$estimate, r5$estimate, rd, rr),
+    ci_lower = c(
+      max(0, r0$estimate - 1.96 * r0$standard_error),
+      max(0, r5$estimate - 1.96 * r5$standard_error),
+      rd - 1.96 * se_rd,
+      exp(log(rr) - 1.96 * se_log_rr)
+    ),
+    ci_upper = c(
+      min(1, r0$estimate + 1.96 * r0$standard_error),
+      min(1, r5$estimate + 1.96 * r5$standard_error),
+      rd + 1.96 * se_rd,
+      exp(log(rr) + 1.96 * se_log_rr)
+    ),
+    stringsAsFactors = FALSE
   )
 }
 
-standardized_point <- standardized_shift(
-  fit_main,
-  d,
-  shift_delta5 = 1
-)
-
-print(standardized_point)
-
-#-----------------------------------------------------------
-# 患者単位cluster bootstrap
-#
-# 同一患者の全ランドマーク行をまとめて再抽出する。
-#-----------------------------------------------------------
-
-cluster_bootstrap_standardized <- function(
-  data,
-  formula,
-  repetitions = 500,
-  seed = 20260722
-) {
-
-  set.seed(seed)
-
-  unique_ids <- unique(
-    as.character(data$id)
-  )
-
-  bootstrap_results <- matrix(
-    NA_real_,
-    nrow = repetitions,
-    ncol = 4
-  )
-
-  colnames(bootstrap_results) <- c(
-    "risk_observed",
-    "risk_shifted",
-    "risk_difference",
-    "risk_ratio"
-  )
-
-  for (b in seq_len(repetitions)) {
-
-    sampled_ids <- sample(
-      unique_ids,
-      size = length(unique_ids),
-      replace = TRUE
-    )
-
-    bootstrap_parts <- vector(
-      "list",
-      length(sampled_ids)
-    )
-
-    for (k in seq_along(sampled_ids)) {
-
-      tmp <- data[
-        as.character(data$id) ==
-          sampled_ids[k],
-        ,
-        drop = FALSE
-      ]
-
-      tmp$id <- factor(
-        paste0("B", b, "_", k)
-      )
-
-      bootstrap_parts[[k]] <- tmp
-    }
-
-    db <- do.call(
-      rbind,
-      bootstrap_parts
-    )
-
-    fit_b <- try(
-      glm(
-        formula,
-        data = db,
-        family = binomial(),
-        na.action = na.exclude
-      ),
-      silent = TRUE
-    )
-
-    if (inherits(fit_b, "try-error")) {
-      next
-    }
-
-    estimate_b <- standardized_shift(
-      fit_b,
-      db,
-      shift_delta5 = 1
-    )
-
-    bootstrap_results[b, ] <- unlist(
-      estimate_b[1, ]
-    )
-  }
-
-  bootstrap_results <- as.data.frame(
-    bootstrap_results
-  )
-
-  bootstrap_results <- bootstrap_results[
-    complete.cases(bootstrap_results),
-    ,
-    drop = FALSE
-  ]
-
-  list(
-    bootstrap_estimates = bootstrap_results,
-    confidence_intervals = data.frame(
-      estimand = names(bootstrap_results),
-      lower = vapply(
-        bootstrap_results,
-        quantile,
-        numeric(1),
-        probs = 0.025,
-        na.rm = TRUE
-      ),
-      upper = vapply(
-        bootstrap_results,
-        quantile,
-        numeric(1),
-        probs = 0.975,
-        na.rm = TRUE
-      )
-    )
-  )
-}
-
-bootstrap_result <- cluster_bootstrap_standardized(
+standardized_result <- standardized_0_vs_5(
+  fit = fit_main,
   data = d,
-  formula = main_formula,
-  repetitions = 500
-)
-
-standardized_result <- data.frame(
-  estimand = c(
-    "risk_observed",
-    "risk_shifted",
-    "risk_difference",
-    "risk_ratio"
-  ),
-  estimate = unlist(standardized_point[1, ]),
-  lower = bootstrap_result$
-    confidence_intervals$lower,
-  upper = bootstrap_result$
-    confidence_intervals$upper
+  vcov_matrix = main_vcov
 )
 
 write.csv(
   standardized_result,
-  file.path(
-    RESULTS_DIRECTORY,
-    "main_standardized_risk.csv"
-  ),
-  row.names = FALSE
-)
-
-write.csv(
-  bootstrap_result$bootstrap_estimates,
-  file.path(
-    RESULTS_DIRECTORY,
-    "main_standardized_bootstrap.csv"
-  ),
+  file.path(TABLE_DIRECTORY, "main_standardized_risk.csv"),
   row.names = FALSE
 )
 

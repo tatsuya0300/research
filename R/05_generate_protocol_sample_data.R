@@ -13,53 +13,28 @@
 # 共通パス設定
 #============================================================
 
-R_DIRECTORY <- normalizePath(
-  "/Users/nakamuratatsuya/Desktop/R",
-  mustWork = TRUE
-)
+# プロジェクトルートの検出
+if (requireNamespace("rprojroot", quietly = TRUE)) {
+  library(rprojroot)
+  ROOT <- find_root(
+    is_git_root | has_file("research.Rproj")
+  )
+} else {
+  ROOT <- getwd()
+}
 
-DATA_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "data"
-)
+DATA_DIRECTORY <- file.path(ROOT, "data")
+RESULTS_DIRECTORY <- file.path(ROOT, "results")
+FIGURE_DIRECTORY <- file.path(RESULTS_DIRECTORY, "figures")
 
-RESULTS_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "results"
-)
-
-FIGURE_DIRECTORY <- file.path(
-  RESULTS_DIRECTORY,
-  "figures"
-)
-
-dir.create(
-  DATA_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  RESULTS_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  FIGURE_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-setwd(R_DIRECTORY)
+dir.create(DATA_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
 
 cat(
-  "\nR directory:",
-  R_DIRECTORY,
-  "\nData directory:",
-  DATA_DIRECTORY,
-  "\nResults directory:",
-  RESULTS_DIRECTORY,
+  "\nRoot directory:", ROOT,
+  "\nData directory:", DATA_DIRECTORY,
+  "\nResults directory:", RESULTS_DIRECTORY,
   "\n"
 )
 
@@ -666,16 +641,23 @@ for (z in seq_along(self_indices)) {
     )
   )
 
-  days_since_last_change <- round(
-    clamp(
-      rexp(
-        1,
-        rate = 1 / 10
-      ),
-      0,
-      30
+  # 約15%は直前の処方変更なし（欠測）、
+  # 残りは最大120日までの安定期間
+  no_change <- rbinom(1, 1, 0.15)
+
+  days_since_last_change <- if (
+    no_change == 1
+  ) {
+    NA_real_
+  } else {
+    round(
+      clamp(
+        rexp(1, rate = 1 / 18),
+        0,
+        120
+      )
     )
-  )
+  }
 
   # 自己管理終了、退棟等までの時間
   remaining_stay <-

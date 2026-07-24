@@ -100,6 +100,8 @@ d$mrci5 <- d$mrci0 / 5
 d$mrci_a5 <- d$mrci_a0 / 5
 d$mrci_b5 <- d$mrci_b0 / 5
 d$mrci_c5 <- d$mrci_c0 / 5
+d$mrci_prn5 <- d$mrci_prn0 / 5
+d$mrci_all5 <- d$mrci_all0 / 5
 
 stopifnot(
   all(d$discharge_complete_self %in% c(0, 1)),
@@ -180,7 +182,7 @@ fit_modified_poisson <- function(formula, data) {
   )
 }
 
-robust_table <- function(object) {
+robust_table <- function(object, outcome = "discharge_complete_self") {
 
   ct <- lmtest::coeftest(
     object$fit,
@@ -196,7 +198,7 @@ robust_table <- function(object) {
     ci_upper = exp(ct[, 1] + 1.96 * ct[, 2]),
     p_value = ct[, 4],
     n = nrow(object$data),
-    events = sum(object$data$discharge_complete_self),
+    events = sum(object$data[[outcome]] == 1, na.rm = TRUE),
     row.names = NULL
   )
 }
@@ -479,7 +481,7 @@ fit_trial <- fit_modified_poisson(
 )
 
 write.csv(
-  robust_table(fit_trial),
+  robust_table(fit_trial, outcome = "trial_started"),
   file.path(TABLE_DIR, "trial_started_analysis.csv"),
   row.names = FALSE
 )
@@ -765,13 +767,13 @@ sensitivity_results <- rbind(
   run_sensitivity(
     d,
     "MRCI including PRN",
-    exposure = "I(mrci_prn0 / 5)"
+    exposure = "mrci_prn5"
   ),
 
   run_sensitivity(
     d,
     "All-prescription MRCI",
-    exposure = "I(mrci_all0 / 5)"
+    exposure = "mrci_all5"
   )
 )
 

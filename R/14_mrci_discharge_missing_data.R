@@ -46,6 +46,10 @@ d <- readRDS(data_file)
 
 d$mrci5 <- d$mrci0 / 5
 
+# premorbid_mrs を ordered から unordered factor に変換し、
+# 主要解析（13番）のダミー変数調整と一致させる。
+d$premorbid_mrs <- factor(d$premorbid_mrs, ordered = FALSE)
+
 mi_variables <- c(
   "discharge_complete_self",
   "mrci5",

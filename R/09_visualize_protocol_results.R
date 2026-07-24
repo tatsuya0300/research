@@ -24,54 +24,29 @@ options(
 # 共通パス設定
 #============================================================
 
-R_DIRECTORY <- normalizePath(
-  "/Users/nakamuratatsuya/Desktop/R",
-  mustWork = TRUE
-)
+if (requireNamespace("rprojroot", quietly = TRUE)) {
+  library(rprojroot)
+  ROOT <- find_root(is_git_root | has_file("research.Rproj"))
+} else {
+  ROOT <- getwd()
+}
 
-DATA_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "data"
-)
+DATA_DIRECTORY    <- file.path(ROOT, "data")
+RESULTS_DIRECTORY <- file.path(ROOT, "results")
+FIGURE_DIRECTORY  <- file.path(RESULTS_DIRECTORY, "figures")
+TABLE_DIRECTORY   <- file.path(RESULTS_DIRECTORY, "tables")
 
-RESULTS_DIRECTORY <- file.path(
-  R_DIRECTORY,
-  "results"
-)
+dir.create(DATA_DIRECTORY,    recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIRECTORY, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIRECTORY,  recursive = TRUE, showWarnings = FALSE)
+dir.create(TABLE_DIRECTORY,   recursive = TRUE, showWarnings = FALSE)
 
-FIGURE_DIRECTORY <- file.path(
+cat("\nRoot:", ROOT, "\nData:", DATA_DIRECTORY, "\n")
+
+# 新しい解析結果ファイルも探索
+manuscript_object_file <- file.path(
   RESULTS_DIRECTORY,
-  "figures"
-)
-
-dir.create(
-  DATA_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  RESULTS_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-dir.create(
-  FIGURE_DIRECTORY,
-  recursive = TRUE,
-  showWarnings = FALSE
-)
-
-setwd(R_DIRECTORY)
-
-cat(
-  "\nR directory:",
-  R_DIRECTORY,
-  "\nData directory:",
-  DATA_DIRECTORY,
-  "\nResults directory:",
-  RESULTS_DIRECTORY,
-  "\n"
+  "manuscript_analysis_objects.rds"
 )
 
 #============================================================
@@ -130,29 +105,7 @@ dir.create(
   showWarnings = FALSE
 )
 
-cat(
-  "R directory:",
-  project_root,
-  "\n"
-)
-
-cat(
-  "Data directory:",
-  data_directory,
-  "\n"
-)
-
-cat(
-  "Results directory:",
-  results_directory,
-  "\n"
-)
-
-cat(
-  "Figure directory:",
-  figure_directory,
-  "\n"
-)
+cat("Figure directory:", figure_directory, "\n")
 
 #============================================================
 # 3. 共通設定
@@ -227,46 +180,37 @@ error_file <- file.path(
   "sample_medication_error.rds"
 )
 
-primary_object_file <- file.path(
-  results_directory,
-  "primary_analysis_objects.rds"
-)
+# 新形式（10_manuscript_analysis.R）があれば優先
+if (file.exists(manuscript_object_file)) {
 
-required_files <- c(
-  landmark_file,
-  error_file,
-  primary_object_file
-)
+  primary_objects <- readRDS(manuscript_object_file)
+  has_manuscript <- TRUE
+  cat("10_manuscript_analysis.R の解析オブジェクトを読み込みました。\n")
 
-missing_files <- required_files[
-  !file.exists(required_files)
-]
+} else {
 
-if (length(missing_files) > 0) {
-
-  stop(
-    paste0(
-      "必要なファイルがありません。\n",
-      paste(
-        missing_files,
-        collapse = "\n"
-      ),
-      "\n\n先にR/08_run_protocol_analysis.Rを実行してください。"
-    )
+  # 従来の06からの結果
+  primary_object_file <- file.path(
+    results_directory,
+    "primary_analysis_objects.rds"
   )
+
+  if (!file.exists(primary_object_file)) {
+    stop(
+      paste0(
+        "解析オブジェクトが見つかりません。\n",
+        "先に08_run_protocol_analysis.Rまたは",
+        "10_manuscript_analysis.Rを実行してください。"
+      )
+    )
+  }
+
+  primary_objects <- readRDS(primary_object_file)
+  has_manuscript <- FALSE
 }
 
-d <- readRDS(
-  landmark_file
-)
-
-e <- readRDS(
-  error_file
-)
-
-primary_objects <- readRDS(
-  primary_object_file
-)
+d <- readRDS(landmark_file)
+e <- readRDS(error_file)
 
 #============================================================
 # 5. 変数型
@@ -460,179 +404,108 @@ save_figure(
 # CIは患者cluster-robust covarianceを用いたdelta method。
 #============================================================
 
-fit_main <- primary_objects$fit_main
-main_vcov <- primary_objects$main_vcov
+# Figure 3：スプライン（10_manuscript_analysis.Rの結果を優先）
+if (has_manuscript && !is.null(primary_objects$fit_spline)) {
 
-standardized_curve <- function(
-  fit,
-  data,
-  vcov_matrix,
-  values
-) {
+  # 10_manuscript_analysis.R のスプライン結果で上書き
+  fit_spline <- primary_objects$fit_spline
+  spline_curve <- primary_objects$spline_curve
 
-  beta_names <- names(
-    coef(fit)
-  )
-
-  output <- vector(
-    "list",
-    length(values)
-  )
-
-  for (i in seq_along(values)) {
-
-    newdata <- data
-    newdata$delta5 <- values[i]
-
-    predicted <- predict(
-      fit,
-      newdata = newdata,
-      type = "response"
+  p3 <- ggplot(
+    spline_curve,
+    aes(x = delta_mrci, y = probability)
+  ) +
+    geom_ribbon(
+      aes(ymin = conf_low, ymax = conf_high),
+      fill = "#5DADE2", alpha = 0.25
+    ) +
+    geom_line(colour = "#1B4F72", linewidth = 1) +
+    geom_vline(xintercept = 0, linetype = 2, colour = "grey35") +
+    geom_rug(
+      data = fit_spline$data,
+      aes(x = delta_mrci),
+      inherit.aes = FALSE,
+      sides = "b", alpha = 0.15
+    ) +
+    scale_y_continuous(labels = function(x) percent_label(x, digits = 0)) +
+    labs(
+      title = "MRCI-J change and 30-day self-management probability",
+      subtitle = "Natural cubic spline with patient-cluster robust 95% CI",
+      x = "MRCI-J decrease (positive = simplification)",
+      y = "Standardized 30-day probability"
     )
 
-    X <- model.matrix(
-      delete.response(
-        terms(fit)
-      ),
-      data = newdata,
-      contrasts.arg = fit$contrasts,
-      xlev = fit$xlevels
-    )
+} else {
 
-    X <- X[
-      ,
-      beta_names,
-      drop = FALSE
-    ]
+  # 従来の線形モデルでの曲線（fallback）
+  fit_main <- primary_objects$fit_main
+  main_vcov <- primary_objects$main_vcov
 
-    gradient <- colMeans(
-      X *
-        as.numeric(
-          predicted *
-            (1 - predicted)
-        )
-    )
+  standardized_curve <- function(fit, data, vcov_matrix, values) {
 
-    standard_error <- sqrt(
-      as.numeric(
-        t(gradient) %*%
-          vcov_matrix %*%
-          gradient
+    beta_names <- names(coef(fit))
+
+    output <- vector("list", length(values))
+
+    for (i in seq_along(values)) {
+
+      newdata <- data
+      newdata$delta5 <- values[i]
+
+      predicted <- predict(fit, newdata = newdata, type = "response")
+
+      X <- model.matrix(
+        delete.response(terms(fit)),
+        data = newdata,
+        contrasts.arg = fit$contrasts,
+        xlev = fit$xlevels
       )
-    )
+      X <- X[, beta_names, drop = FALSE]
 
-    estimate <- mean(
-      predicted,
-      na.rm = TRUE
-    )
+      gradient <- colMeans(X * as.numeric(predicted * (1 - predicted)))
+      se <- sqrt(as.numeric(t(gradient) %*% vcov_matrix %*% gradient))
+      est <- mean(predicted, na.rm = TRUE)
 
-    output[[i]] <- data.frame(
-      delta5 = values[i],
-      delta_mrci = 5 * values[i],
-      probability = estimate,
-      lower = max(
-        0,
-        estimate - 1.96 * standard_error
-      ),
-      upper = min(
-        1,
-        estimate + 1.96 * standard_error
+      output[[i]] <- data.frame(
+        delta5 = values[i],
+        delta_mrci = 5 * values[i],
+        probability = est,
+        lower = max(0, est - 1.96 * se),
+        upper = min(1, est + 1.96 * se)
       )
-    )
+    }
+
+    do.call(rbind, output)
   }
 
-  do.call(
-    rbind,
-    output
+  delta_limits <- quantile(d$delta5, probs = c(0.01, 0.99), na.rm = TRUE)
+  delta_grid <- seq(delta_limits[1], delta_limits[2], length.out = 100)
+
+  adjusted_curve <- standardized_curve(
+    fit = fit_main, data = d, vcov_matrix = main_vcov, values = delta_grid
   )
+
+  write.csv(adjusted_curve,
+    file.path(results_directory, "adjusted_probability_curve.csv"),
+    row.names = FALSE)
+
+  p3 <- ggplot(adjusted_curve, aes(x = delta_mrci, y = probability)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#5DADE2", alpha = 0.25) +
+    geom_line(colour = "#1B4F72", linewidth = 1.1) +
+    geom_vline(xintercept = 0, linetype = 2, colour = "grey35") +
+    scale_y_continuous(
+      labels = function(x) percent_label(x, digits = 0),
+      limits = c(0, max(adjusted_curve$upper, na.rm = TRUE) * 1.05)
+    ) +
+    labs(
+      title = "Adjusted 30-day probability of full self-management",
+      subtitle = "Standardized predictions; shaded area is a model-based 95% CI",
+      x = "MRCI-J decrease during the preceding period (positive = simplification)",
+      y = "Adjusted 30-day probability"
+    )
 }
 
-delta_limits <- quantile(
-  d$delta5,
-  probs = c(0.01, 0.99),
-  na.rm = TRUE
-)
-
-delta_grid <- seq(
-  delta_limits[1],
-  delta_limits[2],
-  length.out = 100
-)
-
-adjusted_curve <- standardized_curve(
-  fit = fit_main,
-  data = d,
-  vcov_matrix = main_vcov,
-  values = delta_grid
-)
-
-write.csv(
-  adjusted_curve,
-  file.path(
-    results_directory,
-    "adjusted_probability_curve.csv"
-  ),
-  row.names = FALSE
-)
-
-p3 <- ggplot(
-  adjusted_curve,
-  aes(
-    x = delta_mrci,
-    y = probability
-  )
-) +
-  geom_ribbon(
-    aes(
-      ymin = lower,
-      ymax = upper
-    ),
-    fill = "#5DADE2",
-    alpha = 0.25
-  ) +
-  geom_line(
-    colour = "#1B4F72",
-    linewidth = 1.1
-  ) +
-  geom_vline(
-    xintercept = 0,
-    linetype = 2,
-    colour = "grey35"
-  ) +
-  scale_y_continuous(
-    labels = function(x) {
-      percent_label(
-        x,
-        digits = 0
-      )
-    },
-    limits = c(
-      0,
-      max(
-        adjusted_curve$upper,
-        na.rm = TRUE
-      ) * 1.05
-    )
-  ) +
-  labs(
-    title = "Adjusted 30-day probability of full self-management",
-    subtitle = paste0(
-      "Standardized predictions from the pooled logistic model; ",
-      "shaded area is a model-based 95% CI."
-    ),
-    x = paste0(
-      "MRCI-J decrease during the preceding period ",
-      "(positive = simplification)"
-    ),
-    y = "Adjusted 30-day probability"
-  )
-
-save_figure(
-  p3,
-  "Figure03_adjusted_probability.png",
-  width = 8,
-  height = 6
-)
+save_figure(p3, "Figure03_adjusted_probability.png", width = 8, height = 6)
 
 #============================================================
 # Figure 4

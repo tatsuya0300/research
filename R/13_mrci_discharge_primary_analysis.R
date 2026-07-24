@@ -161,6 +161,29 @@ fit_modified_poisson <- function(formula, data) {
     drop = FALSE
   ]
 
+  # 1水準因子の事前チェック
+  factor_variables <- intersect(
+    model_variables,
+    names(md)[vapply(md, is.factor, logical(1))]
+  )
+
+  single_level_factors <- factor_variables[
+    vapply(
+      md[factor_variables],
+      function(x) nlevels(droplevels(x)) < 2L,
+      logical(1)
+    )
+  ]
+
+  if (length(single_level_factors) > 0L) {
+    stop(
+      "回帰対象データで1水準しかない因子: ",
+      paste(single_level_factors, collapse = ", "),
+      "\nformula: ",
+      paste(deparse(formula), collapse = " ")
+    )
+  }
+
   fit <- glm(
     formula,
     data = md,
@@ -695,24 +718,48 @@ write.csv(
 run_sensitivity <- function(
   data,
   label,
-  exposure = "mrci5"
+  exposure = "mrci5",
+  remove_adjusters = character(0)
 ) {
 
-  formula_text <- paste(
-    "discharge_complete_self ~",
-    exposure,
-    "+ age + sex + premorbid_manager + premorbid_mrs +",
-    "stroke_type + fim_motor0 + fim_cognitive0 +",
-    "family_support0 + ward + admission_year"
+  adjusters <- c(
+    "age",
+    "sex",
+    "premorbid_manager",
+    "premorbid_mrs",
+    "stroke_type",
+    "fim_motor0",
+    "fim_cognitive0",
+    "family_support0",
+    "ward",
+    "admission_year"
+  )
+
+  adjusters <- setdiff(
+    adjusters,
+    remove_adjusters
+  )
+
+  message("Sensitivity analysis: ", label)
+
+  formula_sensitivity <- reformulate(
+    termlabels = c(exposure, adjusters),
+    response = "discharge_complete_self"
   )
 
   fit <- fit_modified_poisson(
-    as.formula(formula_text),
+    formula_sensitivity,
     data
   )
 
   result <- robust_table(fit)
-  result <- result[result$variable == exposure, ]
+
+  result <- result[
+    result$variable == exposure,
+    ,
+    drop = FALSE
+  ]
+
   result$analysis <- label
 
   result
@@ -741,12 +788,14 @@ sensitivity_results <- rbind(
 
   run_sensitivity(
     subset(d, ward == "Rehabilitation"),
-    "Rehabilitation ward only"
+    "Rehabilitation ward only",
+    remove_adjusters = "ward"
   ),
 
   run_sensitivity(
     subset(d, premorbid_manager == "Self"),
-    "Premorbid self-management only"
+    "Premorbid self-management only",
+    remove_adjusters = "premorbid_manager"
   ),
 
   run_sensitivity(

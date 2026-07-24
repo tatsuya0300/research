@@ -180,7 +180,21 @@ cat("データ品質確認完了\n")
 
 fit_cluster_glm <- function(formula, data) {
 
-  model_variables <- unique(c(all.vars(formula), "id"))
+  # delta_mrciはスプライン曲線のx軸およびrug plotで使用する。
+  # モデル式に含まれていなくても解析データ内に保持する。
+  retained_variables <- intersect(
+    c("delta_mrci"),
+    names(data)
+  )
+
+  model_variables <- unique(
+    c(
+      all.vars(formula),
+      "id",
+      retained_variables
+    )
+  )
+
   model_data <- data |> select(all_of(model_variables)) |> drop_na()
 
   fit <- glm(

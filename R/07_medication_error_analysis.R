@@ -84,7 +84,8 @@ library(MASS)
 # 2. フォルダ設定
 #============================================================
 
-project_root <- R_DIRECTORY
+# R_DIRECTORYは定義されていないためROOTを使用する。
+project_root <- ROOT
 
 data_directory <- DATA_DIRECTORY
 

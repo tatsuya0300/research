@@ -674,6 +674,17 @@ for (z in seq_along(self_indices)) {
     management_stop_time
   )
 
+  # 欠測時にerror_lp全体がNAになることを防ぐ。
+  # 「直前の処方変更なし／不明」は基準カテゴリーとして扱う。
+  change_within_2_days <-
+    !is.na(days_since_last_change) &&
+    days_since_last_change <= 2
+
+  change_3_to_7_days <-
+    !is.na(days_since_last_change) &&
+    days_since_last_change >= 3 &&
+    days_since_last_change <= 7
+
   # 1日当たり服薬エラー率
   error_lp <-
     log(1.18) * (mrci_start / 5) -
@@ -683,9 +694,8 @@ for (z in seq_along(self_indices)) {
     0.30 * mixed_package +
     0.20 * brought_in_and_hospital_mix -
     0.20 * one_dose_package +
-    0.40 * (days_since_last_change <= 2) +
-    0.20 * (days_since_last_change >= 3 &
-              days_since_last_change <= 7) -
+    0.40 * change_within_2_days +
+    0.20 * change_3_to_7_days -
     0.018 * (fim_cognitive_matrix[
       i,
       current_snapshot_index

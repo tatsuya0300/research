@@ -38,7 +38,8 @@ scripts <- file.path(
     "06_primary_sequential_landmark_analysis.R",
     "07_medication_error_analysis.R",
     "10_manuscript_analysis.R",
-    "11_medication_error_manuscript_analysis.R"
+    "11_medication_error_manuscript_analysis.R",
+    "09_visualize_protocol_results.R"
   )
 )
 
